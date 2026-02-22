@@ -23,6 +23,7 @@ jobs:
           mkdir -p Hyperkey.app/Contents/MacOS Hyperkey.app/Contents/Resources
           cp .build/apple/Products/Release/hyperkey Hyperkey.app/Contents/MacOS/
           cp Info.plist Hyperkey.app/Contents/
+          cp AppIcon.icns Hyperkey.app/Contents/Resources/
 
       - name: Zip app bundle
         run: |

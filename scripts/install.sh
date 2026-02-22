@@ -19,6 +19,7 @@ echo "Installing to $APP_DIR..."
 mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
 cp "$BUILT_BINARY" "$APP_DIR/Contents/MacOS/hyperkey"
 cp "$PROJECT_DIR/Info.plist" "$APP_DIR/Contents/Info.plist"
+cp "$PROJECT_DIR/AppIcon.icns" "$APP_DIR/Contents/Resources/AppIcon.icns"
 
 echo ""
 echo "Installed! Open Hyperkey from Spotlight/Raycast."
