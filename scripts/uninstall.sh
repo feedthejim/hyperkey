@@ -2,22 +2,16 @@
 set -euo pipefail
 
 APP_DIR="/Applications/Hyperkey.app"
-PLIST_NAME="com.feedthejim.hyperkey.plist"
-LAUNCH_AGENTS_DIR="$HOME/Library/LaunchAgents"
+PLIST="$HOME/Library/LaunchAgents/com.feedthejim.hyperkey.plist"
 
-echo "Stopping hyperkey..."
-launchctl bootout "gui/$(id -u)/$PLIST_NAME" 2>/dev/null || true
+# Stop the LaunchAgent if running
+launchctl bootout "gui/$(id -u)/com.feedthejim.hyperkey.plist" 2>/dev/null || true
 
-# Clear the hidutil mapping
+# Clear hidutil mapping
 "$APP_DIR/Contents/MacOS/hyperkey" --uninstall 2>/dev/null || true
 
-echo "Removing LaunchAgent..."
-rm -f "$LAUNCH_AGENTS_DIR/$PLIST_NAME"
-
-echo "Removing app..."
+# Clean up
+rm -f "$PLIST"
 rm -rf "$APP_DIR"
 
-echo ""
 echo "hyperkey uninstalled. CapsLock restored to default."
-echo "You may also want to remove it from:"
-echo "  System Settings > Privacy & Security > Accessibility"
