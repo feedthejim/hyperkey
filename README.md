@@ -13,29 +13,21 @@ No kernel extensions, no virtual keyboards, no external dependencies. Just ~200 
 
 ## Install
 
+### Download (recommended)
+
+1. Download `Hyperkey.zip` from the [latest release](https://github.com/feedthejim/hyperkey/releases/latest)
+2. Unzip and move `Hyperkey.app` to `/Applications`
+3. Open Hyperkey from Spotlight or Raycast
+4. Grant Accessibility permissions when prompted (System Settings > Privacy & Security > Accessibility)
+5. Click the Caps Lock icon in the menu bar and enable **Launch at Login**
+
+### Build from source
+
 ```bash
 git clone https://github.com/feedthejim/hyperkey.git
 cd hyperkey
-swift build -c release
-```
-
-Then create the app bundle:
-
-```bash
-mkdir -p /Applications/Hyperkey.app/Contents/MacOS /Applications/Hyperkey.app/Contents/Resources
-cp .build/release/hyperkey /Applications/Hyperkey.app/Contents/MacOS/
-cp Info.plist /Applications/Hyperkey.app/Contents/
-```
-
-Or use the install script which also sets up a LaunchAgent:
-
-```bash
 ./scripts/install.sh
 ```
-
-Open **Hyperkey** from Raycast/Spotlight. On first launch, macOS will prompt for Accessibility permissions. Grant access in System Settings > Privacy & Security > Accessibility, then re-launch.
-
-Click the Caps Lock icon in the menu bar and enable **Launch at Login** to start automatically on boot.
 
 ### Uninstall
 
@@ -43,6 +35,8 @@ Click the Caps Lock icon in the menu bar and enable **Launch at Login** to start
 ./scripts/uninstall.sh
 # also remove from System Settings > Privacy & Security > Accessibility
 ```
+
+Or manually: quit from the menu bar, delete `Hyperkey.app` from `/Applications`, and remove `~/Library/LaunchAgents/com.feedthejim.hyperkey.plist`.
 
 ## How it works
 
@@ -57,7 +51,6 @@ The hidutil mapping doesn't persist across reboots. The LaunchAgent (or "Launch 
 ## Requirements
 
 - macOS 13+
-- Swift 6.0+ toolchain
 - Accessibility permissions
 
 ## License

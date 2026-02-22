@@ -1,0 +1,32 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build universal binary
+        run: |
+          swift build -c release --arch arm64 --arch x86_64
+
+      - name: Create app bundle
+        run: |
+          mkdir -p Hyperkey.app/Contents/MacOS Hyperkey.app/Contents/Resources
+          cp .build/apple/Products/Release/hyperkey Hyperkey.app/Contents/MacOS/
+          cp Info.plist Hyperkey.app/Contents/
+
+      - name: Zip app bundle
+        run: |
+          ditto -c -k --keepParent Hyperkey.app Hyperkey.zip
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: Hyperkey.zip
+          generate_release_notes: true
