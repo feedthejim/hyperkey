@@ -17,7 +17,23 @@ struct HyperKeyApp {
             return
         }
 
-        // 1. Check accessibility permissions (prompts if needed, exits if denied)
+        // 1. Check for already-running instance
+        let runningApps = NSRunningApplication.runningApplications(withBundleIdentifier: Constants.bundleID)
+        if runningApps.count > 1 {
+            fputs("hyperkey: already running.\n", stderr)
+            return
+        }
+        // Also check by process name for non-bundle launches
+        let selfPID = ProcessInfo.processInfo.processIdentifier
+        let others = NSWorkspace.shared.runningApplications.filter {
+            $0.localizedName == "hyperkey" && $0.processIdentifier != selfPID
+        }
+        if !others.isEmpty {
+            fputs("hyperkey: already running.\n", stderr)
+            return
+        }
+
+        // 2. Check accessibility permissions (prompts if needed, exits if denied)
         Accessibility.ensureAccessibility()
 
         // 2. Apply CapsLock -> F18 mapping via hidutil
@@ -65,7 +81,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let menu = NSMenu()
 
-        let statusMenuItem = NSMenuItem(title: "Hyperkey is running", action: nil, keyEquivalent: "")
+        let statusMenuItem = NSMenuItem(title: "Hyperkey v0.1.0", action: nil, keyEquivalent: "")
         statusMenuItem.isEnabled = false
         menu.addItem(statusMenuItem)
 
