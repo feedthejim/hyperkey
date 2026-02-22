@@ -25,8 +25,14 @@ enum Constants {
         (1 << CGEventType.flagsChanged.rawValue)
     )
 
+    /// Virtual keycode for Escape
+    static let escKeyCode: UInt16 = 0x35
+
     /// App version
     static let version = "0.2.0"
+
+    /// GitHub repo for update checks
+    static let githubRepo = "feedthejim/hyperkey"
 
     /// LaunchAgent label
     static let bundleID = "com.feedthejim.hyperkey"

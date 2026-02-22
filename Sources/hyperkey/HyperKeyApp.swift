@@ -68,8 +68,16 @@ struct HyperKeyApp {
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
+    private var updateMenuItem: NSMenuItem!
+    private var updateURL: String?
+
+    private let escapeKey = "escapeOnTap"
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Restore escape-on-tap preference
+        let savedEscape = UserDefaults.standard.bool(forKey: escapeKey)
+        escapeOnTap = savedEscape
+
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
 
         if let button = statusItem.button {
@@ -85,7 +93,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusMenuItem.isEnabled = false
         menu.addItem(statusMenuItem)
 
+        updateMenuItem = NSMenuItem(title: "Update available", action: #selector(openUpdate(_:)), keyEquivalent: "")
+        updateMenuItem.target = self
+        updateMenuItem.isHidden = true
+        menu.addItem(updateMenuItem)
+
         menu.addItem(NSMenuItem.separator())
+
+        let escapeItem = NSMenuItem(
+            title: "CapsLock alone → Escape",
+            action: #selector(toggleEscape(_:)),
+            keyEquivalent: ""
+        )
+        escapeItem.target = self
+        escapeItem.state = savedEscape ? .on : .off
+        menu.addItem(escapeItem)
 
         let launchItem = NSMenuItem(
             title: "Launch at Login",
@@ -107,6 +129,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(quitItem)
 
         statusItem.menu = menu
+
+        // Check for updates in the background
+        Task {
+            if let (version, url) = await UpdateChecker.check() {
+                updateMenuItem.title = "Update available: v\(version)"
+                updateMenuItem.isHidden = false
+                updateURL = url
+            }
+        }
+    }
+
+    @objc private func toggleEscape(_ sender: NSMenuItem) {
+        let newValue = sender.state != .on
+        escapeOnTap = newValue
+        sender.state = newValue ? .on : .off
+        UserDefaults.standard.set(newValue, forKey: escapeKey)
+    }
+
+    @objc private func openUpdate(_ sender: NSMenuItem) {
+        if let urlString = updateURL, let url = URL(string: urlString) {
+            NSWorkspace.shared.open(url)
+        }
     }
 
     @objc private func toggleLaunchAtLogin(_ sender: NSMenuItem) {

@@ -7,6 +7,7 @@ import Foundation
 nonisolated(unsafe) private var hyperActive = false
 nonisolated(unsafe) private var hyperUsedAsModifier = false
 nonisolated(unsafe) private var eventTapPort: CFMachPort?
+nonisolated(unsafe) var escapeOnTap = false
 
 enum EventTap {
     /// Create and start the CGEventTap. Call on the main thread.
@@ -73,8 +74,20 @@ private func eventTapCallback(
 
     // F18 keyUp: deactivate hyper mode
     if type == .keyUp && keyCode == Constants.f18KeyCode {
+        let wasUsed = hyperUsedAsModifier
         hyperActive = false
         hyperUsedAsModifier = false
+
+        // Tap without combo: send Escape if enabled
+        if !wasUsed && escapeOnTap {
+            let src = CGEventSource(stateID: .hidSystemState)
+            if let down = CGEvent(keyboardEventSource: src, virtualKey: Constants.escKeyCode, keyDown: true),
+               let up = CGEvent(keyboardEventSource: src, virtualKey: Constants.escKeyCode, keyDown: false) {
+                down.post(tap: .cghidEventTap)
+                up.post(tap: .cghidEventTap)
+            }
+        }
+
         // Suppress the F18 keyUp
         return nil
     }
