@@ -25,6 +25,9 @@ enum Constants {
         (1 << CGEventType.flagsChanged.rawValue)
     )
 
+    /// App version
+    static let version = "0.2.0"
+
     /// LaunchAgent label
     static let bundleID = "com.feedthejim.hyperkey"
 }

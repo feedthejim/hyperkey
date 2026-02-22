@@ -13,7 +13,7 @@ struct HyperKeyApp {
 
         // Handle --version flag
         if CommandLine.arguments.contains("--version") {
-            print("hyperkey 0.1.0")
+            print("hyperkey \(Constants.version)")
             return
         }
 
@@ -81,7 +81,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let menu = NSMenu()
 
-        let statusMenuItem = NSMenuItem(title: "Hyperkey v0.1.0", action: nil, keyEquivalent: "")
+        let statusMenuItem = NSMenuItem(title: "Hyperkey v\(Constants.version)", action: nil, keyEquivalent: "")
         statusMenuItem.isEnabled = false
         menu.addItem(statusMenuItem)
 
