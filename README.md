@@ -9,7 +9,15 @@ Karabiner Elements uses a DriverKit virtual keyboard driver that [broke on macOS
 1. `hidutil` remaps Caps Lock to F18 at the HID driver level (Apple's own tool, always works)
 2. A `CGEventTap` intercepts F18 and injects all four modifier flags onto key combos
 
-No kernel extensions, no virtual keyboards, no external dependencies. Just ~200 lines of Swift.
+No kernel extensions, no virtual keyboards, no external dependencies. Just ~300 lines of Swift.
+
+## Features
+
+- **Hyper key**: CapsLock + any key sends Cmd+Ctrl+Opt+Shift + that key
+- **CapsLock alone → Escape**: Optional toggle, great for vim users
+- **Launch at Login**: One-click toggle from the menu bar
+- **Auto-update check**: Notifies you when a new version is available on GitHub
+- **Menu bar icon**: Minimal capslock glyph, no Dock icon
 
 ## Install
 
@@ -44,7 +52,7 @@ Or manually: quit from the menu bar, delete `Hyperkey.app` from `/Applications`,
 |-------|------|-----|
 | HID | Caps Lock → F18 | `hidutil property --set` (prevents caps lock toggle) |
 | Event | F18 → Hyper modifier | `CGEventTap` adds Cmd+Ctrl+Opt+Shift flags to key events |
-| UI | Menu bar icon | `NSStatusItem` with launch-at-login toggle |
+| UI | Menu bar icon | `NSStatusItem` with settings and update notifications |
 
 The hidutil mapping doesn't persist across reboots. The LaunchAgent (or "Launch at Login") re-applies it on login.
 
