@@ -8,7 +8,7 @@
 
     <key>ProgramArguments</key>
     <array>
-        <string>/usr/local/bin/hyperkey</string>
+        <string>/Applications/Hyperkey.app/Contents/MacOS/hyperkey</string>
     </array>
 
     <key>RunAtLoad</key>

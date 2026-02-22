@@ -14,33 +14,34 @@ No kernel extensions, no virtual keyboards, no external dependencies. Just ~200 
 ## Install
 
 ```bash
-# Build
+git clone https://github.com/feedthejim/hyperkey.git
+cd hyperkey
 swift build -c release
-
-# Copy to PATH
-sudo cp .build/release/hyperkey /usr/local/bin/
-
-# Run
-hyperkey
 ```
 
-On first launch, macOS will prompt for Accessibility permissions. Grant access in System Settings > Privacy & Security > Accessibility, then re-run.
+Then create the app bundle:
 
-Click the Caps Lock icon in the menu bar and enable **Launch at Login** to start automatically.
+```bash
+mkdir -p /Applications/Hyperkey.app/Contents/MacOS /Applications/Hyperkey.app/Contents/Resources
+cp .build/release/hyperkey /Applications/Hyperkey.app/Contents/MacOS/
+cp Info.plist /Applications/Hyperkey.app/Contents/
+```
+
+Or use the install script which also sets up a LaunchAgent:
+
+```bash
+./scripts/install.sh
+```
+
+Open **Hyperkey** from Raycast/Spotlight. On first launch, macOS will prompt for Accessibility permissions. Grant access in System Settings > Privacy & Security > Accessibility, then re-launch.
+
+Click the Caps Lock icon in the menu bar and enable **Launch at Login** to start automatically on boot.
 
 ### Uninstall
 
 ```bash
-hyperkey --uninstall   # clears the key mapping
-sudo rm /usr/local/bin/hyperkey
-# remove from System Settings > Privacy & Security > Accessibility
-```
-
-Or use the included scripts:
-
-```bash
-./scripts/install.sh    # build, install, load LaunchAgent
-./scripts/uninstall.sh  # stop, remove everything
+./scripts/uninstall.sh
+# also remove from System Settings > Privacy & Security > Accessibility
 ```
 
 ## How it works
