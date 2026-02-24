@@ -8,6 +8,7 @@ build:
 
 install: build
 	@pkill hyperkey 2>/dev/null; sleep 0.3 || true
+	@tccutil reset Accessibility com.feedthejim.hyperkey 2>/dev/null || true
 	@mkdir -p $(APP)/Contents/MacOS $(APP)/Contents/Resources
 	@cp .build/release/hyperkey $(APP)/Contents/MacOS/
 	@cp Info.plist $(APP)/Contents/
