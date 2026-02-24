@@ -7,6 +7,7 @@ build:
 	swift build -c release
 
 install: build
+	@pkill hyperkey 2>/dev/null; sleep 0.3 || true
 	@mkdir -p $(APP)/Contents/MacOS $(APP)/Contents/Resources
 	@cp .build/release/hyperkey $(APP)/Contents/MacOS/
 	@cp Info.plist $(APP)/Contents/
@@ -17,7 +18,8 @@ install: build
 	@cp -R $(APP) "$(PREFIX)/$(APP)"
 	@rm -rf $(APP)
 	@echo "Installed to $(PREFIX)/$(APP)"
-	@echo "Grant Accessibility permission to Hyperkey in System Settings if prompted."
+	@open "$(PREFIX)/$(APP)"
+	@echo "Installed and launched."
 
 uninstall:
 	@"$(PREFIX)/$(APP)/Contents/MacOS/hyperkey" --uninstall 2>/dev/null || true
