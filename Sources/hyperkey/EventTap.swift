@@ -1,11 +1,8 @@
 import CoreGraphics
 import Foundation
 
-/// Mutable state for the event tap callback.
-/// CGEventTapCallBack is a C function pointer, so it cannot capture context.
-/// Global state is the standard pattern for CGEventTap in Swift.
-nonisolated(unsafe) private var hyperActive = false
-nonisolated(unsafe) private var hyperUsedAsModifier = false
+/// CGEventTap state. The port is private to this file; hyperActive/hyperUsedAsModifier
+/// are shared globals in Constants.swift (also used by KeyboardMonitor).
 nonisolated(unsafe) private var eventTapPort: CFMachPort?
 nonisolated(unsafe) var escapeOnTap = false
 
@@ -59,36 +56,40 @@ private func eventTapCallback(
         return Unmanaged.passUnretained(event)
     }
 
+    // Skip events injected by the HID seizure path (avoid feedback loops)
+    if event.getIntegerValueField(Constants.injectedEventField) == Constants.injectedEventMarker {
+        return Unmanaged.passUnretained(event)
+    }
+
     let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
 
-    // F18 keyDown: activate hyper mode
+    // F18 keyDown: activate hyper mode (from hidutil-remapped keyboards)
     if type == .keyDown && keyCode == Constants.f18KeyCode {
         if !hyperActive {
-            // Only reset on initial press, not on key repeats
             hyperActive = true
             hyperUsedAsModifier = false
         }
-        // Suppress the F18 event
         return nil
     }
 
-    // F18 keyUp: deactivate hyper mode
+    // F18 keyUp: deactivate hyper mode (from hidutil-remapped keyboards)
     if type == .keyUp && keyCode == Constants.f18KeyCode {
-        let wasUsed = hyperUsedAsModifier
-        hyperActive = false
-        hyperUsedAsModifier = false
+        return deactivateHyper()
+    }
 
-        // Tap without combo: send Escape if enabled
-        if !wasUsed && escapeOnTap {
-            let src = CGEventSource(stateID: .hidSystemState)
-            if let down = CGEvent(keyboardEventSource: src, virtualKey: Constants.escKeyCode, keyDown: true),
-               let up = CGEvent(keyboardEventSource: src, virtualKey: Constants.escKeyCode, keyDown: false) {
-                down.post(tap: .cghidEventTap)
-                up.post(tap: .cghidEventTap)
+    // CapsLock flagsChanged: fallback for keyboards where hidutil doesn't remap.
+    // When CapsLock is pressed, macOS sends flagsChanged with keycode 57.
+    // alphaShift flag present = key down, absent = key up.
+    if type == .flagsChanged && keyCode == Constants.capsLockKeyCode {
+        let isDown = event.flags.contains(Constants.capsLockFlag)
+        if isDown {
+            if !hyperActive {
+                hyperActive = true
+                hyperUsedAsModifier = false
             }
+        } else {
+            return deactivateHyper()
         }
-
-        // Suppress the F18 keyUp
         return nil
     }
 
@@ -99,7 +100,7 @@ private func eventTapCallback(
         return Unmanaged.passUnretained(event)
     }
 
-    // flagsChanged events while hyper is active
+    // flagsChanged events while hyper is active (e.g. holding Shift with Hyper)
     if hyperActive && type == .flagsChanged {
         hyperUsedAsModifier = true
         event.flags = CGEventFlags(rawValue: event.flags.rawValue | Constants.hyperFlags.rawValue)
@@ -108,4 +109,22 @@ private func eventTapCallback(
 
     // Everything else: pass through unmodified
     return Unmanaged.passUnretained(event)
+}
+
+/// Shared logic for deactivating hyper mode (used by both F18 and CapsLock paths).
+private func deactivateHyper() -> Unmanaged<CGEvent>? {
+    let wasUsed = hyperUsedAsModifier
+    hyperActive = false
+    hyperUsedAsModifier = false
+
+    if !wasUsed && escapeOnTap {
+        let src = CGEventSource(stateID: .hidSystemState)
+        if let down = CGEvent(keyboardEventSource: src, virtualKey: Constants.escKeyCode, keyDown: true),
+           let up = CGEvent(keyboardEventSource: src, virtualKey: Constants.escKeyCode, keyDown: false) {
+            down.post(tap: .cghidEventTap)
+            up.post(tap: .cghidEventTap)
+        }
+    }
+
+    return nil
 }

@@ -39,7 +39,11 @@ struct HyperKeyApp {
         // 2. Apply CapsLock -> F18 mapping via hidutil
         HIDMapping.applyCapsLockToF18()
 
-        // 3. Set up signal handlers for clean shutdown
+        // 3. Monitor for keyboard connect/disconnect to re-apply mapping
+        //    (fixes external keyboards plugged in after launch)
+        KeyboardMonitor.start()
+
+        // 4. Set up signal handlers for clean shutdown
         signal(SIGINT) { _ in
             HIDMapping.clearMapping()
             fputs("\nhyperkey: stopped, CapsLock mapping cleared.\n", stderr)
@@ -51,10 +55,10 @@ struct HyperKeyApp {
             exit(0)
         }
 
-        // 4. Start the event tap (runs on the main run loop)
+        // 5. Start the event tap (runs on the main run loop)
         EventTap.start()
 
-        // 5. Set up NSApplication with menu bar item
+        // 6. Set up NSApplication with menu bar item
         let app = NSApplication.shared
         app.setActivationPolicy(.accessory) // Hide from Dock
 
