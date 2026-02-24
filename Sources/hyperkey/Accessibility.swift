@@ -3,7 +3,7 @@ import Foundation
 
 enum Accessibility {
     /// Check if we have accessibility permissions.
-    /// If not, prompt the user and wait until they grant access.
+    /// If not, prompt the user and poll using the run loop (keeps app responsive).
     static func ensureAccessibility() {
         let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
 
@@ -13,10 +13,10 @@ enum Accessibility {
 
         fputs("hyperkey: waiting for Accessibility permission...\n", stderr)
 
-        // Poll until the user grants permission instead of exiting.
-        // This avoids requiring a manual restart after granting access.
+        // Poll using CFRunLoop instead of Thread.sleep so the app stays responsive
+        // and macOS doesn't show "not responding" dialogs.
         while !AXIsProcessTrusted() {
-            Thread.sleep(forTimeInterval: 1)
+            CFRunLoopRunInMode(.defaultMode, 1.0, false)
         }
 
         fputs("hyperkey: Accessibility permission granted.\n", stderr)
