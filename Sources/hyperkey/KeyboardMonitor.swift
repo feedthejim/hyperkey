@@ -12,8 +12,16 @@ nonisolated(unsafe) private var currentModifierFlags: UInt64 = 0
 /// This module seizes external keyboards via IOKit HID, intercepts all input,
 /// and re-injects key events as CGEvents with hyper mode logic applied.
 /// Built-in keyboards are left to the CGEventTap path in EventTap.swift.
+/// Connected keyboard info for menu display.
+struct KeyboardInfo {
+    let name: String
+    let status: String // "Built-in", "Seized", "Skipped"
+}
+
 enum KeyboardMonitor {
     private nonisolated(unsafe) static var manager: IOHIDManager?
+    /// Connected keyboards for menu display. Updated on connect/disconnect.
+    nonisolated(unsafe) static var connectedDevices: [KeyboardInfo] = []
 
     static func start() {
         let manager = IOHIDManagerCreate(kCFAllocatorDefault, IOOptionBits(kIOHIDOptionsTypeNone))
@@ -67,6 +75,7 @@ private func deviceConnectedCallback(
     if isBuiltIn(device) {
         fputs("hyperkey: built-in keyboard (\(name)), using CGEventTap path\n", stderr)
         HIDMapping.applyCapsLockToF18()
+        KeyboardMonitor.connectedDevices.append(KeyboardInfo(name: name, status: "Built-in"))
         return
     }
 
@@ -78,6 +87,7 @@ private func deviceConnectedCallback(
     if seizeResult == kIOReturnSuccess {
         IOHIDDeviceRegisterInputValueCallback(device, hidInputCallback, nil)
         fputs("hyperkey: seized external keyboard (\(name))\n", stderr)
+        KeyboardMonitor.connectedDevices.append(KeyboardInfo(name: name, status: "Seized"))
     } else {
         fputs("hyperkey: skipping \(name) (could not seize, error \(seizeResult))\n", stderr)
     }
@@ -91,6 +101,7 @@ private func deviceRemovedCallback(
 ) {
     let name = productName(device)
     fputs("hyperkey: keyboard disconnected (\(name))\n", stderr)
+    KeyboardMonitor.connectedDevices.removeAll { $0.name == name }
 
     // Clear state to prevent stuck modifiers
     if hyperActive {

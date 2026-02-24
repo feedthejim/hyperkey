@@ -36,7 +36,7 @@ No kernel extensions, no virtual keyboards, no external dependencies. Just Swift
 ```bash
 git clone https://github.com/feedthejim/hyperkey.git
 cd hyperkey
-make install
+make install    # builds, signs, and installs to /Applications
 ```
 
 ### Uninstall

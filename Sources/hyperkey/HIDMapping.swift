@@ -4,7 +4,9 @@ enum HIDMapping {
     /// Apply the CapsLock -> F18 mapping via hidutil.
     /// Operates at the HID driver level, preventing caps lock toggle behavior.
     /// Does not persist across reboots (the LaunchAgent re-applies it).
-    static func applyCapsLockToF18() {
+    /// Returns true on success, false on failure.
+    @discardableResult
+    static func applyCapsLockToF18() -> Bool {
         let src = Constants.hidCapsLock
         let dst = Constants.hidF18
 
@@ -23,9 +25,12 @@ enum HIDMapping {
             process.waitUntilExit()
             if process.terminationStatus != 0 {
                 fputs("hyperkey: warning: hidutil mapping failed (status \(process.terminationStatus))\n", stderr)
+                return false
             }
+            return true
         } catch {
             fputs("hyperkey: warning: could not run hidutil: \(error)\n", stderr)
+            return false
         }
     }
 

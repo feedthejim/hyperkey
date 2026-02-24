@@ -1,4 +1,5 @@
 import AppKit
+import ApplicationServices
 import Foundation
 
 @main
@@ -23,7 +24,6 @@ struct HyperKeyApp {
             fputs("hyperkey: already running.\n", stderr)
             return
         }
-        // Also check by process name for non-bundle launches
         let selfPID = ProcessInfo.processInfo.processIdentifier
         let others = NSWorkspace.shared.runningApplications.filter {
             $0.localizedName == "hyperkey" && $0.processIdentifier != selfPID
@@ -33,17 +33,16 @@ struct HyperKeyApp {
             return
         }
 
-        // 2. Check accessibility permissions (prompts if needed, exits if denied)
+        // 2. Check accessibility permissions (waits until granted)
         Accessibility.ensureAccessibility()
 
-        // 2. Apply CapsLock -> F18 mapping via hidutil
-        HIDMapping.applyCapsLockToF18()
+        // 3. Apply CapsLock -> F18 mapping via hidutil
+        let hidMappingOK = HIDMapping.applyCapsLockToF18()
 
-        // 3. Monitor for keyboard connect/disconnect to re-apply mapping
-        //    (fixes external keyboards plugged in after launch)
+        // 4. Monitor for keyboard connect/disconnect and seize external keyboards
         KeyboardMonitor.start()
 
-        // 4. Set up signal handlers for clean shutdown
+        // 5. Set up signal handlers for clean shutdown
         signal(SIGINT) { _ in
             HIDMapping.clearMapping()
             fputs("\nhyperkey: stopped, CapsLock mapping cleared.\n", stderr)
@@ -55,30 +54,38 @@ struct HyperKeyApp {
             exit(0)
         }
 
-        // 5. Start the event tap (runs on the main run loop)
+        // 6. Start the event tap (runs on the main run loop)
         EventTap.start()
 
-        // 6. Set up NSApplication with menu bar item
+        // 7. Set up NSApplication with menu bar item
         let app = NSApplication.shared
-        app.setActivationPolicy(.accessory) // Hide from Dock
+        app.setActivationPolicy(.accessory)
 
-        let delegate = AppDelegate()
+        let delegate = AppDelegate(hidMappingOK: hidMappingOK)
         app.delegate = delegate
 
-        app.run() // Blocks forever, drives the CFRunLoop
+        app.run()
     }
 }
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem!
     private var updateMenuItem: NSMenuItem!
+    private var checkForUpdatesItem: NSMenuItem!
+    private var warningMenuItem: NSMenuItem!
+    private var keyboardsMenuItem: NSMenuItem!
     private var updateURL: String?
+    private let hidMappingOK: Bool
 
     private let escapeKey = "escapeOnTap"
 
+    init(hidMappingOK: Bool) {
+        self.hidMappingOK = hidMappingOK
+        super.init()
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Restore escape-on-tap preference
         let savedEscape = UserDefaults.standard.bool(forKey: escapeKey)
         escapeOnTap = savedEscape
 
@@ -92,20 +99,47 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let menu = NSMenu()
+        menu.delegate = self
 
+        // Version
         let statusMenuItem = NSMenuItem(title: "Hyperkey v\(Constants.version)", action: nil, keyEquivalent: "")
         statusMenuItem.isEnabled = false
         menu.addItem(statusMenuItem)
 
+        // Update available (hidden until detected)
         updateMenuItem = NSMenuItem(title: "Update available", action: #selector(openUpdate(_:)), keyEquivalent: "")
         updateMenuItem.target = self
         updateMenuItem.isHidden = true
         menu.addItem(updateMenuItem)
 
+        // Check for Updates
+        checkForUpdatesItem = NSMenuItem(title: "Check for Updates", action: #selector(checkForUpdates(_:)), keyEquivalent: "")
+        checkForUpdatesItem.target = self
+        menu.addItem(checkForUpdatesItem)
+
+        // Warning (hidden unless something is wrong)
+        warningMenuItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        warningMenuItem.isHidden = true
+        menu.addItem(warningMenuItem)
+
+        if !hidMappingOK {
+            warningMenuItem.title = "Warning: HID mapping failed"
+            warningMenuItem.isHidden = false
+        }
+
         menu.addItem(NSMenuItem.separator())
 
+        // Keyboards submenu
+        keyboardsMenuItem = NSMenuItem(title: "Keyboards", action: nil, keyEquivalent: "")
+        let keyboardsSubmenu = NSMenu()
+        keyboardsMenuItem.submenu = keyboardsSubmenu
+        menu.addItem(keyboardsMenuItem)
+
+        menu.addItem(NSMenuItem.separator())
+
+        // CapsLock -> Escape toggle
         let escapeItem = NSMenuItem(
-            title: "CapsLock alone → Escape",
+            title: "CapsLock alone \u{2192} Escape",
             action: #selector(toggleEscape(_:)),
             keyEquivalent: ""
         )
@@ -113,17 +147,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         escapeItem.state = savedEscape ? .on : .off
         menu.addItem(escapeItem)
 
+        // Launch at Login toggle
         let launchItem = NSMenuItem(
             title: "Launch at Login",
             action: #selector(toggleLaunchAtLogin(_:)),
             keyEquivalent: ""
         )
         launchItem.target = self
-        launchItem.state = isLaunchAgentLoaded() ? .on : .off
+        launchItem.state = isLaunchAgentInstalled() ? .on : .off
         menu.addItem(launchItem)
 
         menu.addItem(NSMenuItem.separator())
 
+        // Quit
         let quitItem = NSMenuItem(
             title: "Quit Hyperkey",
             action: #selector(quitApp(_:)),
@@ -134,15 +170,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         statusItem.menu = menu
 
-        // Check for updates in the background
-        Task {
-            if let (version, url) = await UpdateChecker.check() {
-                updateMenuItem.title = "Update available: v\(version)"
-                updateMenuItem.isHidden = false
-                updateURL = url
+        // Check for updates (uses 24h cache)
+        Task { await performUpdateCheck() }
+    }
+
+    // MARK: - NSMenuDelegate
+
+    func menuWillOpen(_ menu: NSMenu) {
+        // Check accessibility on every menu open
+        if !AXIsProcessTrusted() {
+            warningMenuItem.title = "Warning: Accessibility permission revoked"
+            warningMenuItem.isHidden = false
+        } else if hidMappingOK {
+            warningMenuItem.isHidden = true
+        }
+
+        // Refresh keyboards submenu
+        if let submenu = keyboardsMenuItem.submenu {
+            submenu.removeAllItems()
+            let devices = KeyboardMonitor.connectedDevices
+            if devices.isEmpty {
+                let item = NSMenuItem(title: "No keyboards detected", action: nil, keyEquivalent: "")
+                item.isEnabled = false
+                submenu.addItem(item)
+            } else {
+                for device in devices {
+                    let item = NSMenuItem(title: "\(device.name) (\(device.status))", action: nil, keyEquivalent: "")
+                    item.isEnabled = false
+                    submenu.addItem(item)
+                }
             }
         }
     }
+
+    // MARK: - Actions
 
     @objc private func toggleEscape(_ sender: NSMenuItem) {
         let newValue = sender.state != .on
@@ -154,6 +215,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func openUpdate(_ sender: NSMenuItem) {
         if let urlString = updateURL, let url = URL(string: urlString) {
             NSWorkspace.shared.open(url)
+        }
+    }
+
+    @objc private func checkForUpdates(_ sender: NSMenuItem) {
+        sender.title = "Checking..."
+        sender.isEnabled = false
+        Task {
+            await performUpdateCheck(force: true)
+            sender.title = "Check for Updates"
+            sender.isEnabled = true
         }
     }
 
@@ -180,7 +251,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // Install and load
             try? FileManager.default.createDirectory(at: launchAgentsDir, withIntermediateDirectories: true)
 
-            let execPath = CommandLine.arguments[0]
+            let execPath = Bundle.main.executableURL?.path ?? CommandLine.arguments[0]
             let plistContent = """
             <?xml version="1.0" encoding="UTF-8"?>
             <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
@@ -214,17 +285,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             </plist>
             """
 
-            try? plistContent.write(to: plistPath, atomically: true, encoding: .utf8)
+            do {
+                try plistContent.write(to: plistPath, atomically: true, encoding: .utf8)
+            } catch {
+                fputs("hyperkey: failed to write LaunchAgent plist: \(error)\n", stderr)
+                return
+            }
 
             let process = Process()
             process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
             process.arguments = ["bootstrap", "gui/\(uid)", plistPath.path]
             process.standardOutput = FileHandle.nullDevice
             process.standardError = FileHandle.nullDevice
-            try? process.run()
-            process.waitUntilExit()
-
-            sender.state = .on
+            do {
+                try process.run()
+                process.waitUntilExit()
+                if process.terminationStatus == 0 {
+                    sender.state = .on
+                } else {
+                    fputs("hyperkey: launchctl bootstrap failed (status \(process.terminationStatus))\n", stderr)
+                }
+            } catch {
+                fputs("hyperkey: failed to run launchctl: \(error)\n", stderr)
+            }
         }
     }
 
@@ -233,7 +316,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApplication.shared.terminate(nil)
     }
 
-    private func isLaunchAgentLoaded() -> Bool {
+    // MARK: - Helpers
+
+    private func performUpdateCheck(force: Bool = false) async {
+        if let (version, url) = await UpdateChecker.check(force: force) {
+            updateMenuItem.title = "Update available: v\(version)"
+            updateMenuItem.isHidden = false
+            updateURL = url
+        } else if force {
+            updateMenuItem.title = "Up to date"
+            updateMenuItem.isHidden = false
+            updateURL = nil
+            // Hide "up to date" after 5 seconds
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
+                if self?.updateURL == nil {
+                    self?.updateMenuItem.isHidden = true
+                }
+            }
+        }
+    }
+
+    private func isLaunchAgentInstalled() -> Bool {
         let plistPath = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/LaunchAgents/\(Constants.bundleID).plist")
         return FileManager.default.fileExists(atPath: plistPath.path)
