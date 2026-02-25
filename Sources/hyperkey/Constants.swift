@@ -6,6 +6,7 @@ import CoreGraphics
 /// synchronization is needed.
 nonisolated(unsafe) var hyperActive = false
 nonisolated(unsafe) var hyperUsedAsModifier = false
+nonisolated(unsafe) var includeShiftInHyper = true
 
 enum Constants {
     /// Virtual keycode for F18 (0x4F)
@@ -17,13 +18,21 @@ enum Constants {
     /// HID usage ID for F18
     static let hidF18: UInt64 = 0x70000006D
 
-    /// Combined hyper modifier flags: Cmd + Ctrl + Opt + Shift
-    static let hyperFlags = CGEventFlags(rawValue:
+    /// Base hyper modifier flags: Cmd + Ctrl + Opt
+    static let hyperBaseFlags = CGEventFlags(rawValue:
         CGEventFlags.maskCommand.rawValue |
         CGEventFlags.maskControl.rawValue |
-        CGEventFlags.maskAlternate.rawValue |
-        CGEventFlags.maskShift.rawValue
+        CGEventFlags.maskAlternate.rawValue
     )
+
+    /// Current hyper modifier flags, optionally including Shift.
+    static func currentHyperFlags() -> CGEventFlags {
+        var flags = hyperBaseFlags.rawValue
+        if includeShiftInHyper {
+            flags |= CGEventFlags.maskShift.rawValue
+        }
+        return CGEventFlags(rawValue: flags)
+    }
 
     /// Event mask for key events we intercept
     static let eventMask: CGEventMask = (

@@ -192,7 +192,8 @@ private func injectKey(keyCode: UInt16, keyDown: Bool, addHyperFlags: Bool = fal
 
     var flags = CGEventFlags(rawValue: currentModifierFlags)
     if addHyperFlags {
-        flags = CGEventFlags(rawValue: flags.rawValue | Constants.hyperFlags.rawValue)
+        let hyperFlags = Constants.currentHyperFlags()
+        flags = CGEventFlags(rawValue: flags.rawValue | hyperFlags.rawValue)
     }
     event.flags = flags
 
@@ -209,7 +210,8 @@ private func injectFlagsChanged(keyCode: UInt16) {
     var flags = CGEventFlags(rawValue: currentModifierFlags)
     if hyperActive {
         hyperUsedAsModifier = true
-        flags = CGEventFlags(rawValue: flags.rawValue | Constants.hyperFlags.rawValue)
+        let hyperFlags = Constants.currentHyperFlags()
+        flags = CGEventFlags(rawValue: flags.rawValue | hyperFlags.rawValue)
     }
     event.flags = flags
 
