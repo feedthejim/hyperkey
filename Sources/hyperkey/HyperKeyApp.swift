@@ -79,6 +79,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let hidMappingOK: Bool
 
     private let escapeKey = "escapeOnTap"
+    private let includeShiftKey = "includeShiftInHyper"
 
     init(hidMappingOK: Bool) {
         self.hidMappingOK = hidMappingOK
@@ -86,8 +87,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        let savedEscape = UserDefaults.standard.bool(forKey: escapeKey)
+        let defaults = UserDefaults.standard
+        let savedEscape = defaults.bool(forKey: escapeKey)
+        let savedIncludeShift = defaults.object(forKey: includeShiftKey) as? Bool ?? true
         escapeOnTap = savedEscape
+        includeShiftInHyper = savedIncludeShift
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
 
@@ -146,6 +150,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         escapeItem.target = self
         escapeItem.state = savedEscape ? .on : .off
         menu.addItem(escapeItem)
+
+        let includeShiftItem = NSMenuItem(
+            title: "Include Shift in Hyper",
+            action: #selector(toggleIncludeShift(_:)),
+            keyEquivalent: ""
+        )
+        includeShiftItem.target = self
+        includeShiftItem.state = savedIncludeShift ? .on : .off
+        menu.addItem(includeShiftItem)
 
         // Launch at Login toggle
         let launchItem = NSMenuItem(
@@ -210,6 +223,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         escapeOnTap = newValue
         sender.state = newValue ? .on : .off
         UserDefaults.standard.set(newValue, forKey: escapeKey)
+    }
+
+    @objc private func toggleIncludeShift(_ sender: NSMenuItem) {
+        let newValue = sender.state != .on
+        includeShiftInHyper = newValue
+        sender.state = newValue ? .on : .off
+        UserDefaults.standard.set(newValue, forKey: includeShiftKey)
     }
 
     @objc private func openUpdate(_ sender: NSMenuItem) {

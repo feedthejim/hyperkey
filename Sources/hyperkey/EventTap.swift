@@ -96,14 +96,16 @@ private func eventTapCallback(
     // Any other key while hyper is active: add modifier flags
     if hyperActive && (type == .keyDown || type == .keyUp) {
         hyperUsedAsModifier = true
-        event.flags = CGEventFlags(rawValue: event.flags.rawValue | Constants.hyperFlags.rawValue)
+        let hyperFlags = Constants.currentHyperFlags()
+        event.flags = CGEventFlags(rawValue: event.flags.rawValue | hyperFlags.rawValue)
         return Unmanaged.passUnretained(event)
     }
 
     // flagsChanged events while hyper is active (e.g. holding Shift with Hyper)
     if hyperActive && type == .flagsChanged {
         hyperUsedAsModifier = true
-        event.flags = CGEventFlags(rawValue: event.flags.rawValue | Constants.hyperFlags.rawValue)
+        let hyperFlags = Constants.currentHyperFlags()
+        event.flags = CGEventFlags(rawValue: event.flags.rawValue | hyperFlags.rawValue)
         return Unmanaged.passUnretained(event)
     }
 
